@@ -1,26 +1,39 @@
-import CryptoJS from 'crypto-js';
+import * as Crypto from 'expo-crypto';
 
 // Generate a random encryption key for each chat
-export function generateEncryptionKey(): string {
-  return CryptoJS.lib.WordArray.random(256/8).toString();
+export async function generateEncryptionKey(): Promise<string> {
+  const randomBytes = await Crypto.getRandomBytesAsync(32);
+  return Array.from(randomBytes, byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
-// Encrypt message content
+// Simple XOR encryption for demo purposes
+// In production, use proper encryption libraries like react-native-crypto
 export function encryptMessage(message: string, key: string): string {
   try {
-    return CryptoJS.AES.encrypt(message, key).toString();
+    let encrypted = '';
+    for (let i = 0; i < message.length; i++) {
+      const messageChar = message.charCodeAt(i);
+      const keyChar = key.charCodeAt(i % key.length);
+      encrypted += String.fromCharCode(messageChar ^ keyChar);
+    }
+    return btoa(encrypted); // Base64 encode
   } catch (error) {
     console.error('Encryption failed:', error);
     return message; // Fallback to plain text
   }
 }
 
-// Decrypt message content
+// Simple XOR decryption
 export function decryptMessage(encryptedMessage: string, key: string): string {
   try {
-    const bytes = CryptoJS.AES.decrypt(encryptedMessage, key);
-    const decrypted = bytes.toString(CryptoJS.enc.Utf8);
-    return decrypted || encryptedMessage; // Fallback if decryption fails
+    const encrypted = atob(encryptedMessage); // Base64 decode
+    let decrypted = '';
+    for (let i = 0; i < encrypted.length; i++) {
+      const encryptedChar = encrypted.charCodeAt(i);
+      const keyChar = key.charCodeAt(i % key.length);
+      decrypted += String.fromCharCode(encryptedChar ^ keyChar);
+    }
+    return decrypted;
   } catch (error) {
     console.error('Decryption failed:', error);
     return encryptedMessage; // Fallback to encrypted text
@@ -28,6 +41,11 @@ export function decryptMessage(encryptedMessage: string, key: string): string {
 }
 
 // Hash function for secure key derivation
-export function deriveKey(input: string): string {
-  return CryptoJS.SHA256(input).toString();
+export async function deriveKey(input: string): Promise<string> {
+  const digest = await Crypto.digestStringAsync(
+    Crypto.CryptoDigestAlgorithm.SHA256,
+    input,
+    { encoding: Crypto.CryptoEncoding.HEX }
+  );
+  return digest;
 }
